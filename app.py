@@ -163,12 +163,22 @@ elif menu == "3. EDA":
     st.title("📊 Exploratory Data Analysis (EDA)")
     st.write("Analisis relasi antar fitur dan hubungannya dengan Lama Rawat Inap pasien.")
     
+    df_eda = df.copy()
+    df_eda['hari_bersih'] = pd.to_numeric(df_eda['lama_dirawat'], errors='coerce').round().astype(int)
+    df_eda['target_biner'] = np.where(df_eda['hari_bersih'] >= 5, 0, 1)
+    df_eda['target_label'] = df_eda['target_biner'].map({
+        0: 'Lama (>=5 hari)',
+        1: 'Cepat (<5 hari)'
+    })
+    
+    # 1. Statistik Deskriptif
     st.markdown("### 1. Statistik Deskriptif (Overview Data)")
     st.dataframe(df.describe().T, use_container_width=True)
-
+    
+    # 2. Distribusi Kelas Target
     st.markdown("### 2. Distribusi Kelas Target")
     col_t1, col_t2 = st.columns(2)
-    counts = df_encoded['target'].value_counts().sort_index()
+    counts = df_eda['target_biner'].value_counts().sort_index()
     labels = ['Lama (>=5 Hari)', 'Cepat (<5 Hari)']
     
     with col_t1:
@@ -185,21 +195,20 @@ elif menu == "3. EDA":
         fig2, ax2 = plt.subplots(figsize=(5, 4))
         ax2.pie(counts, labels=labels, autopct='%1.1f%%', colors=['#FF1493', '#FFB6C1'], wedgeprops={'edgecolor': '#C71585'})
         st.pyplot(fig2)
-
+    
+    # 3. Histogram & KDE
     st.markdown("### 3. Histogram & KDE (Sebaran Fitur Berdasarkan Target)")
     st.write("Melihat penumpukan nilai (distribusi) pasien pada setiap fitur numerik.")
     
     fitur_numerik = ['umur', 'hemoglobin', 'hct', 'trombosit']
-    
-    # Menghindari error pemetaan string dengan menggunakan kolom baru secara aman
-    df_plot = df_encoded.copy()
-    df_plot['Status Rawat Inap'] = df_plot['target'].apply(lambda x: 'Lama (>=5 Hari)' if x == 0 else 'Cepat (<5 Hari)')
+    df_hist = df_encoded.copy()
+    df_hist['Status Rawat Inap'] = df_hist['target'].apply(lambda x: 'Lama (>=5 Hari)' if x == 0 else 'Cepat (<5 Hari)')
     
     fig3, axes = plt.subplots(2, 2, figsize=(14, 10))
     axes = axes.flatten()
     
     for i, col in enumerate(fitur_numerik):
-        sns.histplot(data=df_plot, x=col, hue='Status Rawat Inap', kde=True, 
+        sns.histplot(data=df_hist, x=col, hue='Status Rawat Inap', kde=True, 
                      palette=['#FF1493', '#FFB6C1'], ax=axes[i], 
                      alpha=0.6, bins=20, line_kws={'linewidth': 2})
         
@@ -211,12 +220,70 @@ elif menu == "3. EDA":
         
     plt.tight_layout(pad=3.0)
     st.pyplot(fig3)
-
-    st.markdown("### 4. Korelasi antar Fitur (Heatmap)")
-    fig4, ax4 = plt.subplots(figsize=(7, 5))
-    corr_data = df_encoded[fitur_numerik + ['target']].corr()
-    sns.heatmap(corr_data, annot=True, cmap='RdPu', fmt=".2f", ax=ax4)
+    
+    # 4. Tren Jumlah Pasien Per Hari
+    st.markdown("### 4. Tren Jumlah Pasien Berdasarkan Lama Hari Dirawat")
+    st.write("Distribusi pasien sebelum dikelompokkan menjadi target biner (>=5 hari vs <5 hari).")
+    
+    urutan_hari = sorted(df_eda['hari_bersih'].unique())
+    fig4, ax4 = plt.subplots(figsize=(11, 5))
+    sns.countplot(data=df_eda, x='hari_bersih', order=urutan_hari, palette='RdPu', ax=ax4)
+    ax4.set_title("Tren Distribusi Jumlah Pasien DBD Berdasarkan Lama Hari Dirawat", fontsize=12, pad=15)
+    ax4.set_xlabel("Lama Dirawat (Hari)", fontsize=10)
+    ax4.set_ylabel("Jumlah Pasien (Orang)", fontsize=10)
+    ax4.grid(axis='y', linestyle='--', alpha=0.5)
+    
+    for p in ax4.patches:
+        if p.get_height() > 0:
+            ax4.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                        ha='center', va='center', xytext=(0, 5), textcoords='offset points', fontsize=9)
     st.pyplot(fig4)
+    
+    # 5. Sebaran Fitur Kategorikal Berdasarkan Target
+    st.markdown("### 5. Sebaran Fitur Kategorikal Berdasarkan Target")
+    st.write("Perbandingan jumlah pasien untuk setiap kategori jenis kelamin dan jenis demam.")
+    
+    fitur_kategorikal = ['jenis_kelamin', 'jenis_demam']
+    for col in fitur_kategorikal:
+        fig5, ax5 = plt.subplots(figsize=(6, 4))
+        sns.countplot(data=df_eda, x=col, hue='target_label', 
+                      palette={'Lama (>=5 hari)': '#FF1493', 'Cepat (<5 hari)': '#FFB6C1'}, ax=ax5)
+        ax5.set_title(f"Perbandingan Fitur {col.upper()} Berdasarkan Target Rawat Inap")
+        ax5.set_xlabel(col.upper())
+        ax5.set_ylabel("Jumlah Pasien")
+        ax5.grid(axis='y', linestyle='--', alpha=0.5)
+        ax5.legend(title='Target')
+        st.pyplot(fig5)
+    
+    # 6. Korelasi Antar Fitur Numerik (Pearson)
+    st.markdown("### 6. Korelasi Antar Fitur Numerik (Pearson)")
+    st.write("Korelasi linier antara variabel numerik: umur, hemoglobin, hct, trombosit.")
+    
+    matriks_korelasi = df_eda[fitur_numerik].corr(method='pearson')
+    fig6, ax6 = plt.subplots(figsize=(6, 5))
+    sns.heatmap(matriks_korelasi, annot=True, cmap='RdPu', fmt='.2f', linewidths=0.5, ax=ax6)
+    ax6.set_title('Matriks Korelasi Pearson (Fitur Numerik)', fontsize=11, pad=15)
+    st.pyplot(fig6)
+    
+    # 7. Uji Chi-Square: Fitur Kategorikal vs Target
+    st.markdown("### 7. Uji Chi-Square: Hubungan Fitur Kategorikal dengan Target")
+    st.write("Menguji apakah jenis kelamin dan jenis demam memiliki hubungan signifikan dengan lama rawat inap (biner).")
+    
+    X_categorical = df_eda[['jenis_kelamin', 'jenis_demam']].copy()
+    y_binary = df_eda['target_biner']
+    
+    for col in X_categorical.columns:
+        X_categorical[col] = X_categorical[col].astype(str).astype('category').cat.codes
+    
+    chi2_scores, p_values = chi2(X_categorical, y_binary)
+    
+    hasil_chi2 = pd.DataFrame({
+        'Fitur': ['jenis_kelamin', 'jenis_demam'],
+        'Chi-Square Score': chi2_scores,
+        'P-Value': p_values,
+    })
+    st.dataframe(hasil_chi2, use_container_width=True)
+    st.caption("Catatan Medis: P-Value < 0.05 menunjukkan adanya hubungan signifikan dengan target lama rawat inap.")
 
 elif menu == "4. Prediksi Lama Rawat Inap":
     st.title("Form Prediksi Lama Rawat Inap")
