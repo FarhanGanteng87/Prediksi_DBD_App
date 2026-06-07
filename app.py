@@ -42,6 +42,37 @@ st.markdown(
         background-color: #FFFFFF !important;
     }
     
+    /* ========== HEADER STYLING ========== */
+    /* Background header menjadi pink lembut */
+    .stAppHeader {
+        background-color: #FFE4E1 !important;
+        border-bottom: 2px solid #FFB6C1 !important;
+    }
+
+    /* Warna ikon, teks, dan tombol di header */
+    .stAppHeader button svg,
+    .stAppHeader span[data-testid="stIconMaterial"],
+    .stAppHeader .st-emotion-cache-2x5h05,
+    .stAppHeader .st-emotion-cache-1wbqy5l span,
+    .stAppHeader .stMainMenu button svg {
+        color: #C71585 !important; /* pink gelap */
+    }
+
+    /* Tombol header (hamburger, deploy, dll) saat normal */
+    .stAppHeader button {
+        background-color: transparent !important;
+    }
+
+    /* Hover effect pada tombol header */
+    .stAppHeader button:hover {
+        background-color: #FFB6C1 !important;
+    }
+
+    /* Teks "Deploy" di header */
+    .stAppDeployButton button div span {
+        color: #C71585 !important;
+    }
+
     /* Sidebar CSS */
     [data-testid="stSidebar"] { background-color: #FFE4E1 !important; }
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label { color: #000000 !important; }
@@ -66,6 +97,11 @@ st.markdown(
         color: #FFFFFF !important;            
         border: 1px solid #FF69B4 !important;
     }
+
+    div[data-testid="stForm"] button p {
+    color: #FFFFFF !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
